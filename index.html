@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SORA | 穹之空 - 經典美學版</title>
     <script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+import { createAppKit } from "https://esm.sh/@reown/appkit@1.9.0";
+import { mainnet, base } from "https://esm.sh/@reown/appkit@1.9.0/networks";
+import { injected } from "https://esm.sh/@reown/appkit@1.9.0/adapters/injected/solana";
+window.createAppKit = createAppKit;
+window.mainnet = mainnet;
+window.base = base;
+window.injected = injected;
+</script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@900&family=Noto+Sans+TC:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -122,6 +131,11 @@
     </header>
 
     <div id="side-overlay" class="fixed inset-0 bg-black/10 backdrop-blur-sm z-[60] hidden opacity-0 transition-opacity duration-500" onclick="toggleSideMenu(false)"></div>
+
+<style>
+@keyframes slideUp { from { transform: translateY(100%); } }
+.animate-slide-up { animation: slideUp 0.3s ease forwards; }
+</style>
     <aside id="side-drawer" class="fixed inset-y-0 left-0 w-72 glass-panel z-[70] p-10 translate-x-[-100%] transition-transform duration-500 rounded-r-[40px]">
         <div class="flex justify-between items-center mb-12">
             <span class="serif text-sm opacity-20 italic font-black uppercase tracking-widest">Index</span>
@@ -165,19 +179,20 @@
     </nav>
 
     <script>
-        let state = {
-            lang: 'zh',
-            view: 'home',
-            wallet: null,
-            theme: 'light'
-        };
+let state = {
+  lang: 'zh',
+  view: 'home',
+  wallet: null,
+  walletDisplay: null,
+  theme: 'light'
+};
 
         const i18n = {
             zh: {
                 h_title: "在遙遠的天空之下", h_desc: "這是一個關於找回純粹與建立永續的故事。在 Base 鏈上，與「穹」一起見證奇蹟。",
                 n_title: "穹之收藏", n_btn: "立即鑄造",
                 a_title: "空投份額", a_sub: "你的獎勵份額總覽", a_claim: "申請領取",
-                p_title: "個人設定", p_lang: "介面語言", p_conn: "連結錢包",
+                p_title: "個人設定", p_lang: "介面語言", p_conn: "連結錢包", p_disconn: "斷開連接",
                 c_title: "循環機制", c_desc: "1% 交易燃燒、國庫回購計畫與質押分紅機制。",
                 g_title: "視覺畫廊", back: "返回",
                 ab_title: "關於 SORA", ab_sub: "我們的願景與使命"
@@ -186,7 +201,7 @@
                 h_title: "Beneath the Sky", h_desc: "A story of purity and sustainability on Base chain. Witness miracles with Sora.",
                 n_title: "Collection", n_btn: "Mint Now",
                 a_title: "Allocations", a_sub: "Your rewards summary", a_claim: "Claim Airdrop",
-                p_title: "Settings", p_lang: "Language", p_conn: "Connect Wallet",
+                p_title: "Settings", p_lang: "Language", p_conn: "Connect Wallet", p_disconn: "Disconnect",
                 c_title: "Ecosystem", c_desc: "1% burn, buybacks, and staking rewards.",
                 g_title: "Gallery", back: "Back",
                 ab_title: "About SORA", ab_sub: "Vision & Mission"
@@ -195,7 +210,7 @@
                 h_title: "あの空の下で", h_desc: "Baseチェーンで、ソラと共に奇跡を。絆の物語がここから始まる。",
                 n_title: "コレクション", n_btn: "ミントする",
                 a_title: "配分", a_sub: "報酬の概要", a_claim: "請求する",
-                p_title: "設定", p_lang: "表示言語", p_conn: "接続する",
+                p_title: "設定", p_lang: "表示言語", p_conn: "接続する", p_disconn: "切断",
                 c_title: "循環メカニズム", c_desc: "1% バーン、買い戻し、報酬分配。",
                 g_title: "ギャラリー", back: "戻る",
                 ab_title: "SORAについて", ab_sub: "ビジョンと使命"
@@ -265,7 +280,7 @@
                                         </div>
                                     </div>
 
-                                    <button onclick="connect()" class="w-full py-5 btn-premium text-xs font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-transform">
+                                    <button onclick="showWalletModal()" class="w-full py-5 btn-premium text-xs font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-transform">
                                         ${t.n_btn}
                                     </button>
                                 </div>
@@ -297,7 +312,7 @@
                                         <div class="h-full bg-gradient-to-r from-blue-300 to-pink-300" style="width: 78%"></div>
                                     </div>
                                 </div>
-                                <button onclick="connect()" class="w-full py-4 btn-premium text-[11px] font-black uppercase tracking-widest">${t.a_claim}</button>
+                                <button onclick="showWalletModal()" class="w-full py-4 btn-premium text-[11px] font-black uppercase tracking-widest">${t.a_claim}</button>
                             </div>
                         </div>
                     `;
@@ -337,7 +352,7 @@
                             <div class="glass-panel p-10 rounded-[45px] space-y-8">
                                 <div class="flex flex-col items-center gap-4">
                                     <div class="w-24 h-24 rounded-full bg-slate-50 border-4 border-white shadow-xl flex items-center justify-center text-4xl">👤</div>
-                                    <p class="font-mono text-[10px] text-slate-400">${state.wallet ? state.wallet : 'Disconnected'}</p>
+                                    <p class="font-mono text-[10px] text-slate-400">${state.walletDisplay ? state.walletDisplay : 'Disconnected'}</p>
                                 </div>
                                 <div class="space-y-4">
                                     <label class="text-[9px] font-black opacity-20 uppercase ml-2">${t.p_lang}</label>
@@ -347,7 +362,7 @@
                                         <div onclick="setLang('jp')" class="lang-chip flex-1 text-center ${state.lang==='jp'?'active':''}">日本語</div>
                                     </div>
                                 </div>
-                                <button onclick="connect()" class="w-full py-4 glass-panel rounded-2xl text-[11px] font-black uppercase tracking-widest">${t.p_conn}</button>
+                                <button onclick="state.wallet ? disconnectWallet() : showWalletModal()" class="w-full py-4 glass-panel rounded-2xl text-[11px] font-black uppercase tracking-widest">${state.wallet ? t.p_disconn : t.p_conn}</button>
                             </div>
                         </div>
                     `;
@@ -407,17 +422,160 @@
 
         function toggleTheme() { document.body.classList.toggle('dark'); }
 
-        async function connect() {
-            if (window.ethereum) {
-                const acc = await ethereum.request({ method: 'eth_requestAccounts' });
-                state.wallet = acc[0].slice(0,6) + "..." + acc[0].slice(-4);
-                document.getElementById('status-indicator').classList.replace('bg-red-400', 'bg-green-400');
-                render();
-            } else { alert("Please open in a Web3 Browser"); }
-        }
+function showWalletModal() {
+  const modal = document.getElementById('wallet-modal');
+  modal.classList.remove('hidden');
+  setTimeout(() => modal.style.opacity = '1', 10);
+}
 
-        window.onload = () => {
-            render();
+function closeWalletModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById('wallet-modal');
+  modal.style.opacity = '0';
+  setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+async function connectWallet(type) {
+  closeWalletModal();
+  if (type === 'metamask') {
+    await connectMetaMask();
+  } else if (type === 'walletconnect') {
+    await connectWalletConnect();
+  }
+}
+
+async function switchToBase(provider) {
+  try {
+    await provider.request({ method: 'eth_switchEthereumChain', params: [{ chainId: '0x2105' }] });
+  } catch (switchError) {
+    if (switchError.code === 4902) {
+      try {
+        await provider.request({
+          method: 'eth_addEthereumChain',
+          params: [{
+            chainId: '0x2105',
+            chainName: 'Base',
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org']
+          }]
+        });
+      } catch (addError) {
+        console.error('Failed to add Base network:', addError);
+      }
+    }
+  }
+}
+
+async function connectMetaMask() {
+  if (window.ethereum) {
+    await switchToBase(window.ethereum);
+    const acc = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    state.wallet = { type: 'metamask', address: acc[0] };
+    state.walletDisplay = acc[0].slice(0,6) + "..." + acc[0].slice(-4);
+    localStorage.setItem('walletConnected', 'true');
+    localStorage.setItem('walletType', 'metamask');
+    document.getElementById('status-indicator').classList.replace('bg-red-400', 'bg-green-400');
+    render();
+  } else {
+    alert("請先安裝 MetaMask 錢包");
+  }
+}
+
+let appkit = null;
+
+async function connectWalletConnect() {
+  try {
+    if (!appkit) {
+      appkit = window.createAppKit({
+        projectId: 'YOUR_PROJECT_ID_HERE',
+        networks: [window.base],
+        metadata: {
+          name: 'SORA - 穹之空',
+          description: 'SORA Portal on Base Chain',
+          url: window.location.origin,
+          icons: ['https://images.unsplash.com/photo-1516466723877-e4ec1d736c8a?auto=format&fit=crop&w=200']
+        }
+      });
+    }
+
+    appkit.open();
+
+    appkit.subscribeAccount((account) => {
+      if (account.address) {
+        state.wallet = { type: 'walletconnect', address: account.address };
+        state.walletDisplay = account.address.slice(0,6) + "..." + account.address.slice(-4);
+        localStorage.setItem('walletConnected', 'true');
+        localStorage.setItem('walletType', 'walletconnect');
+        document.getElementById('status-indicator').classList.replace('bg-red-400', 'bg-green-400');
+        render();
+      }
+    });
+  } catch (e) {
+    console.error('WalletConnect error:', e);
+    alert('WalletConnect 連接失敗: ' + e.message);
+  }
+}
+
+function disconnectWallet() {
+  state.wallet = null;
+  state.walletDisplay = null;
+  localStorage.removeItem('walletConnected');
+  localStorage.removeItem('walletType');
+  if (appkit) {
+    appkit.disconnect();
+  }
+  document.getElementById('status-indicator').classList.replace('bg-green-400', 'bg-red-400');
+  render();
+}
+
+async function checkConnection() {
+  const walletType = localStorage.getItem('walletType');
+  if (localStorage.getItem('walletConnected') === 'true') {
+    if (walletType === 'metamask' && window.ethereum) {
+      try {
+        const acc = await window.ethereum.request({ method: 'eth_accounts' });
+        if (acc.length > 0) {
+          state.wallet = { type: 'metamask', address: acc[0] };
+          state.walletDisplay = acc[0].slice(0,6) + "..." + acc[0].slice(-4);
+          document.getElementById('status-indicator').classList.replace('bg-red-400', 'bg-green-400');
+        }
+      } catch (e) {
+        localStorage.removeItem('walletConnected');
+      }
+    }
+  }
+}
+
+async function checkConnection() {
+  if (window.ethereum && localStorage.getItem('walletConnected') === 'true') {
+    try {
+      const acc = await ethereum.request({ method: 'eth_accounts' });
+      if (acc.length > 0) {
+        state.wallet = acc[0].slice(0,6) + "..." + acc[0].slice(-4);
+        document.getElementById('status-indicator').classList.replace('bg-red-400', 'bg-green-400');
+      }
+    } catch (e) {
+      localStorage.removeItem('walletConnected');
+    }
+  }
+}
+
+if (window.ethereum) {
+  window.ethereum.on('accountsChanged', (accounts) => {
+    if (accounts.length === 0) {
+      disconnectWallet();
+    } else if (state.wallet && state.wallet.type === 'metamask') {
+      state.wallet.address = accounts[0];
+      state.walletDisplay = accounts[0].slice(0,6) + "..." + accounts[0].slice(-4);
+      render();
+    }
+  });
+}
+
+window.onload = () => {
+  checkConnection();
+  render();
             setInterval(() => {
                 const p = document.createElement('div');
                 p.className = 'petal';
