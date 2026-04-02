@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="css/style.css">
   <script src="js/wallet.js"></script>
   <script>
-    // 確保錢包 JS 加載完成後立即 render
     window.addEventListener('DOMContentLoaded', () => {
       if (typeof render === 'function') {
         render();
@@ -17,10 +16,13 @@
     });
   </script>
   <script type="module">
-    import { createWeb3Modal, defaultConfig } from "https://esm.sh/@web3modal/ethers@5.5.0";
+    import { createAppKit } from "https://esm.sh/@reown/appkit@1.9.0";
+    import * as networks from "https://esm.sh/@reown/appkit@1.9.0/networks";
     
-    window.createWeb3Modal = createWeb3Modal;
-    window.defaultConfig = defaultConfig;
+    window.createAppKit = createAppKit;
+    window.appkitNetworks = Object.values(networks);
+    
+    console.log('AppKit loaded via ESM');
 
     window.addEventListener('load', () => {
       setInterval(() => {

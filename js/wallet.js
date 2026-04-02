@@ -1,3 +1,5 @@
+let appkit = null;
+
 const i18n = {
   zh: {
     h_title: "在遙遠的天空之下",
@@ -285,35 +287,55 @@ function toggleTheme() {
   document.body.classList.toggle('dark');
 }
 
+let web3ModalReady = false;
+
+let appkitReady = false;
+
+function triggerRender() {
+  if (typeof render === 'function' && !appkitReady) {
+    render();
+  }
+}
+
+async function waitForAppKit(maxAttempts = 200) {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (window.createAppKit && window.appkitNetworks && window.appkitNetworks.length > 0) {
+      appkitReady = true;
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  return false;
+}
+
 async function connectWallet() {
-  const { createWeb3Modal, defaultConfig } = window;
-  
-  if (!createWeb3Modal || !defaultConfig) {
-    alert('正在加載錢包組件，請稍後再試');
+  const ready = await waitForAppKit();
+  if (!ready) {
+    alert('錢包組件加載失敗，請刷新頁面後重試');
     return;
   }
 
   try {
-    const metadata = {
-      name: 'SORA - 穹之空',
-      description: 'SORA Portal on Base Chain',
-      url: window.location.origin,
-      icons: ['https://images.unsplash.com/photo-1516466723877-e4ec1d736c8a?auto=format&fit=crop&w=200']
-    };
+    const base = window.appkitNetworks.find(n => n.id === 8453) || window.appkitNetworks[0];
+    
+    if (!appkit) {
+      appkit = window.createAppKit({
+        projectId: '368a489c165d39a9035798e6f534688d',
+        networks: [base],
+        metadata: {
+          name: 'SORA - 穹之空',
+          description: 'SORA Portal on Base Chain',
+          url: window.location.origin,
+          icons: ['https://images.unsplash.com/photo-1516466723877-e4ec1d736c8a?auto=format&fit=crop&w=200']
+        }
+      });
+    }
 
-    web3Modal = createWeb3Modal({
-      ethersConfig: defaultConfig({ metadata }),
-      chains: [8453],
-      projectId: 'YOUR_PROJECT_ID_HERE',
-      enableAnalytics: false,
-      enableEIP6963: true
-    });
-
-    web3Modal.subscribeProvider((newProvider) => {
-      if (newProvider.isConnected && newProvider.address) {
-        const address = newProvider.address;
-        state.wallet = { type: 'wallet', address };
-        state.walletDisplay = address.slice(0,6) + "..." + address.slice(-4);
+    appkit.subscribeAccount((account) => {
+      console.log('Account changed:', account);
+      if (account.address) {
+        state.wallet = { type: 'wallet', address: account.address };
+        state.walletDisplay = account.address.slice(0,6) + "..." + account.address.slice(-4);
         localStorage.setItem('walletConnected', 'true');
         localStorage.setItem('walletType', 'wallet');
         const indicator = document.getElementById('status-indicator');
@@ -321,16 +343,14 @@ async function connectWallet() {
           indicator.classList.replace('bg-red-400', 'bg-green-400');
         }
         render();
-      } else if (!newProvider.isConnected) {
-        disconnectWallet();
       }
     });
 
-    web3Modal.open();
+    appkit.open();
 
   } catch (e) {
     console.error('Wallet connection error:', e);
-    alert('錢包連接失敗，請確認已安裝錢包擴充功能');
+    alert('錢包連接失敗，請確認已安裝錢包擴充功能: ' + e.message);
   }
 }
 
@@ -339,14 +359,60 @@ function disconnectWallet() {
   state.walletDisplay = null;
   localStorage.removeItem('walletConnected');
   localStorage.removeItem('walletType');
-  if (web3Modal) {
-    web3Modal.clearCachedProvider();
+  if (appkit) {
+    appkit.disconnect();
   }
+  const indicator = document.getElementById('status-indicator');
+  if (indicator) {
+    indicator.classList.replace('bg-green-400', 'bg-red-400');
+  }
+  render();
+}
+
+async function checkConnection() {
+  const ready = await waitForAppKit(20);
+  if (!ready) return;
+
+  if (window.createAppKit && window.appkitNetworks) {
+    try {
+      const base = window.appkitNetworks.find(n => n.id === 8453) || window.appkitNetworks[0];
+      
+      appkit = window.createAppKit({
+        projectId: '368a489c165d39a9035798e6f534688d',
+        networks: [base],
+        metadata: {
+          name: 'SORA - 穹之空',
+          description: 'SORA Portal on Base Chain',
+          url: window.location.origin,
+          icons: ['https://images.unsplash.com/photo-1516466723877-e4ec1d736c8a?auto=format&fit=crop&w=200']
+        }
+      });
+
+      appkit.subscribeAccount((account) => {
+        console.log('Account changed (check):', account);
+        if (account.address) {
+          state.wallet = { type: 'wallet', address: account.address };
+          state.walletDisplay = account.address.slice(0,6) + "..." + account.address.slice(-4);
+          const indicator = document.getElementById('status-indicator');
+          if (indicator) {
+            indicator.classList.replace('bg-red-400', 'bg-green-400');
+          }
+          render();
+        }
+      });
+    } catch (e) {
+      console.error('Check connection error:', e);
+    }
+  }
+}
   document.getElementById('status-indicator').classList.replace('bg-green-400', 'bg-red-400');
   render();
 }
 
 async function checkConnection() {
+  const ready = await waitForWeb3Modal(20);
+  if (!ready) return;
+
   const { createWeb3Modal, defaultConfig } = window;
   
   if (createWeb3Modal && defaultConfig) {
@@ -361,7 +427,7 @@ async function checkConnection() {
       web3Modal = createWeb3Modal({
         ethersConfig: defaultConfig({ metadata }),
         chains: [8453],
-        projectId: 'YOUR_PROJECT_ID_HERE',
+        projectId: '368a489c165d39a9035798e6f534688d',
         enableAnalytics: false,
         enableEIP6963: true
       });
